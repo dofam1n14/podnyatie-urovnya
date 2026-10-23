@@ -110,10 +110,24 @@
             <button class="btn" type="submit">Войти</button>
           </div>
         </form>
+        <!-- Есть ник на другом устройстве: привязка по коду -->
+        <details class="link-details" id="link-details">
+          <summary>Уже есть ник на другом устройстве?</summary>
+          <form class="add-form" id="link-form" autocomplete="off">
+            <p class="small-text muted">На первом устройстве открой «Рейтинг» → «Привязать устройство» и введи здесь ник и код. Прогресс на этом устройстве заменится прогрессом ника.</p>
+            <input id="link-nick" type="text" maxlength="20" placeholder="Ник" required aria-label="Ник">
+            <div class="add-row">
+              <input id="link-code" type="text" maxlength="6" placeholder="Код из 6 символов" required aria-label="Код привязки" autocapitalize="characters">
+              <button class="btn" type="submit">Привязать</button>
+            </div>
+          </form>
+        </details>
         <!-- Уже в рейтинге -->
         <div class="top-me" id="top-me" hidden>
           Ты в рейтинге как <b id="top-mynick"></b>, место <b id="top-place">—</b>
           <button class="link" id="btn-leave" type="button">выйти</button>
+          <button class="btn link-btn" id="btn-link" type="button">Привязать устройство (телефон / комп)</button>
+          <div class="link-box" id="link-box" hidden></div>
         </div>
         <p class="small-text top-msg" id="top-msg" aria-live="polite"></p>
 

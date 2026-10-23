@@ -108,6 +108,7 @@ function newState() {
     log: [],
     notify: { on: true, morning: '09:00', evening: '21:00' }, // напоминания (только в Android-приложении)
     online: { joined: false, nick: '', secret: '' },          // онлайн-рейтинг
+    savedAt: 0,                                               // когда сохранялись (для синхронизации устройств)
   };
 }
 
@@ -122,6 +123,7 @@ function load() {
 }
 
 function save() {
+  state.savedAt = Date.now();
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) { /* память недоступна */ }
   planNotifications();
   planSync();
@@ -161,18 +163,52 @@ function onlineSecret() {
   return state.online.secret;
 }
 
+// Что уходит в облако: весь прогресс, кроме секрета и настроек этого устройства
+function cloudCopy() {
+  const { online, notify, ...rest } = state;
+  return rest;
+}
+
+// Отправить прогресс в рейтинг и облачное сохранение
 async function submitProgress() {
-  return api('rpc/sys_submit', {
+  return api('rpc/sys_sync', {
     p_nick: state.online.nick,
     p_secret: onlineSecret(),
     p_level: state.level,
     p_total_xp: totalXp(),
     p_streak: state.streak,
     p_best: Math.max(state.best, state.streak),
+    p_save: cloudCopy(),
+    p_save_at: state.savedAt,
   });
 }
 
-// После изменений отправляем прогресс в рейтинг (не чаще раза в 3 секунды)
+// Принять сохранение из облака (секрет и настройки устройства остаются свои)
+function adoptCloud(c) {
+  state = { ...newState(), ...c.save, online: state.online, notify: state.notify, savedAt: c.save_at };
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) { /* память недоступна */ }
+}
+
+// Скачать облачное сохранение, если оно свежее местного. true — прогресс обновлён
+async function pullCloud() {
+  if (!state.online.joined) return false;
+  try {
+    const c = await api('rpc/sys_load', { p_nick: state.online.nick, p_secret: onlineSecret() });
+    if (!c) {
+      // Устройство больше не владеет ником (например, вышли на другом устройстве последним)
+      state.online.joined = false;
+      save(); render();
+      return false;
+    }
+    if (c.save && c.save_at > state.savedAt) {
+      adoptCloud(c);
+      return true;
+    }
+  } catch (e) { /* нет интернета — играем с местным прогрессом */ }
+  return false;
+}
+
+// После изменений отправляем прогресс (не чаще раза в 3 секунды)
 let syncTimer = 0;
 function planSync() {
   if (!state.online.joined) return;
@@ -183,10 +219,84 @@ function planSync() {
       if (res === 'taken') {
         state.online.joined = false;
         save(); render();
-        topMsg('Твой ник в рейтинге занят с другого устройства. Выбери новый.', true);
+        topMsg('Это устройство отвязано от ника. Войди заново или привяжи его кодом.', true);
+      } else if (res === 'stale') {
+        // На другом устройстве прогресс свежее — забираем его
+        if (await pullCloud()) { render(); toast('Прогресс обновлён с другого устройства.'); }
       }
     } catch (e) { /* нет интернета — отправим при следующем изменении */ }
   }, 3000);
+}
+
+// Синхронизация при открытии приложения: сначала облако, потом смена дня.
+// Иначе устройство со старым прогрессом выдало бы наказание за день, закрытый на другом устройстве.
+async function syncAndCheckDay() {
+  if (state.online.joined) {
+    const got = await Promise.race([pullCloud(), new Promise((r) => setTimeout(() => r(false), 4000))]);
+    if (got) toast('Прогресс загружен из облака.');
+  }
+  checkNewDay();
+  render();
+}
+
+/* ---------- Привязка второго устройства по коду ---------- */
+
+let linkTimer = 0;
+
+async function showLinkCode() {
+  const box = $('#link-box');
+  box.hidden = false;
+  box.innerHTML = '<span class="muted small-text">Получаю код…</span>';
+  try {
+    const code = await api('rpc/sys_link_code', { p_nick: state.online.nick, p_secret: onlineSecret() });
+    if (!code) throw new Error('нет кода');
+    const until = Date.now() + 10 * 60 * 1000;
+    box.innerHTML = `<div class="small-text">На другом устройстве открой «Рейтинг» → «Уже есть ник?» и введи ник <b>${esc(state.online.nick)}</b> и код:</div>
+      <div class="link-code">${code}</div>
+      <div class="muted small-text">Код действует <span id="link-left">10:00</span></div>`;
+    clearInterval(linkTimer);
+    linkTimer = setInterval(() => {
+      const s = Math.max(0, Math.round((until - Date.now()) / 1000));
+      const el = $('#link-left');
+      if (el) el.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+      if (!s) { clearInterval(linkTimer); box.innerHTML = '<span class="muted small-text">Код истёк. Получи новый.</span>'; }
+    }, 1000);
+  } catch (e) {
+    box.innerHTML = '<span class="small-text top-msg bad">Не удалось получить код. Проверь интернет.</span>';
+  }
+}
+
+async function useLinkCode(nick, code) {
+  nick = nick.trim();
+  code = code.trim().toUpperCase();
+  if (!nick || !code) return;
+  topMsg('Проверяю код…');
+  try {
+    const res = await api('rpc/sys_link_use', { p_nick: nick, p_code: code, p_new_secret: onlineSecret() });
+    const errors = {
+      wrong: 'Неверный код.',
+      expired: 'Код истёк или не запрошен. Получи новый на первом устройстве.',
+      locked: 'Слишком много попыток. Получи новый код.',
+    };
+    if (res !== 'ok') { topMsg(errors[res] || 'Ошибка привязки (' + res + ').', true); return; }
+    state.online = { ...state.online, joined: true, nick };
+    // Забираем прогресс ника; если облачного сохранения ещё нет — отправим своё
+    const c = await api('rpc/sys_load', { p_nick: nick, p_secret: onlineSecret() });
+    if (c && c.save) {
+      state.online.nick = c.nick || nick;
+      adoptCloud(c);
+      checkNewDay();
+    } else {
+      save();
+    }
+    addLog(`Устройство привязано к нику ${state.online.nick}`, 'good');
+    save(); render();
+    topMsg('');
+    toast('Устройство привязано. Прогресс общий!', 'gold');
+    loadTop();
+  } catch (e) {
+    topMsg('Нет связи с Системой. Проверь интернет.', true);
+  }
 }
 
 function topMsg(text, bad = false) {
@@ -230,8 +340,9 @@ async function joinTop(nick) {
     if (check === 'taken') { topMsg('Этот ник уже занят другим охотником. Выбери другой.', true); return; }
     state.online.nick = nick;
     const res = await submitProgress();
-    if (res !== 'new' && res !== 'ok') { topMsg('Система отклонила данные (' + res + ').', true); return; }
+    if (!['new', 'ok', 'stale'].includes(res)) { topMsg('Система отклонила данные (' + res + ').', true); return; }
     state.online.joined = true;
+    if (res === 'stale') await pullCloud(); // ник уже наш и в облаке прогресс свежее
     addLog(`Вход в рейтинг охотников под ником ${nick}`, 'good');
     save(); render();
     topMsg('');
@@ -646,6 +757,7 @@ function render() {
 
   // Рейтинг
   $('#top-join').hidden = state.online.joined;
+  $('#link-details').hidden = state.online.joined;
   $('#top-me').hidden = !state.online.joined;
   $('#top-mynick').textContent = state.online.nick;
   if (!$('#top-nick').value && document.activeElement !== $('#top-nick')) $('#top-nick').value = state.name;
@@ -694,6 +806,11 @@ document.querySelectorAll('.tab').forEach((tab) => {
 
 $('#top-join').addEventListener('submit', (e) => { e.preventDefault(); joinTop($('#top-nick').value); });
 $('#btn-leave').addEventListener('click', leaveTop);
+$('#btn-link').addEventListener('click', showLinkCode);
+$('#link-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  useLinkCode($('#link-nick').value, $('#link-code').value);
+});
 $('#btn-top-refresh').addEventListener('click', loadTop);
 document.querySelectorAll('.seg button').forEach((b) => {
   b.addEventListener('click', () => {
@@ -816,16 +933,16 @@ statOptions($('#daily-stat'));
 $('#side-rank').innerHTML = Object.entries(QUEST_RANKS)
   .map(([k, r]) => `<option value="${k}">Ранг ${k} · ${r.xp} XP</option>`).join('');
 
-checkNewDay();
 render();
+syncAndCheckDay();
 updateTimers();
 setInterval(updateTimers, 1000);
 
 if (!state.name) showAwakening();
 
-// Проверяем смену дня, когда приложение снова открыли из фона
+// Когда приложение снова открыли из фона: забираем свежий прогресс и проверяем смену дня
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) { checkNewDay(); render(); }
+  if (!document.hidden) syncAndCheckDay();
 });
 
 /* ---------- Установка на главный экран ---------- */
