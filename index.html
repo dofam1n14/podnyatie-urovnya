@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <!-- viewport-fit=cover — растягиваем под «чёлку» телефона, отступы задаём через safe-area -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Система — поднятие уровня в реальной жизни</title>
+  <meta name="description" content="Прокачка себя как в «Поднятии уровня в одиночку»: ежедневные квесты, опыт, уровни, ранги от E до S и штрафная зона за пропуски.">
+  <meta name="keywords" content="поднятие уровня, solo leveling, прокачка себя, система, квесты, трекер привычек, геймификация, ежедневные задания">
+  <link rel="canonical" href="https://podnyatie-urovnya.pages.dev/">
+  <meta name="referrer" content="no-referrer">
+  <!-- Open Graph — красивое превью, когда кидаешь ссылку в Telegram/VK -->
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="ru_RU">
+  <meta property="og:title" content="Система — поднятие уровня в реальной жизни">
+  <meta property="og:description" content="Ежедневные квесты, опыт, ранги от E до S и штрафная зона за пропуски. Прокачай себя, как Сон Джину.">
+  <meta property="og:url" content="https://podnyatie-urovnya.pages.dev/">
+  <meta property="og:image" content="https://podnyatie-urovnya.pages.dev/icon-512.png">
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"WebApplication","name":"Система — поднятие уровня","url":"https://podnyatie-urovnya.pages.dev/","applicationCategory":"LifestyleApplication","operatingSystem":"Any","inLanguage":"ru","offers":{"@type":"Offer","price":"0","priceCurrency":"RUB"},"description":"Прокачка себя в стиле «Поднятия уровня в одиночку»: ежедневные квесты, опыт, уровни, ранги и штрафная зона."}
+  </script>
+  <meta name="theme-color" content="#05070f">
+  <!-- Чтобы на iPhone тоже открывалось как приложение -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Система">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;600;800&family=Russo+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <!-- ===== Экран: СТАТУС ===== -->
+    <section class="screen active" id="screen-status" aria-label="Статус">
+      <div class="window">
+        <div class="window-title">СТАТУС</div>
+        <div class="status-head">
+          <div class="level-box">
+            <div class="level-num" id="st-level">1</div>
+            <div class="level-label">УРОВЕНЬ</div>
+          </div>
+          <div class="status-info">
+            <div><span class="k">ИМЯ:</span> <span id="st-name">—</span></div>
+            <div><span class="k">РАНГ:</span> <span class="rank" id="st-rank">E</span></div>
+            <div><span class="k">ТИТУЛ:</span> <span id="st-title">—</span></div>
+            <div><span class="k">СЕРИЯ:</span> <span id="st-streak">0</span> дн. <span class="muted">(рекорд <span id="st-best">0</span>)</span></div>
+          </div>
+        </div>
+        <div class="xp">
+          <div class="xp-bar"><div class="xp-fill" id="st-xpfill"></div></div>
+          <div class="xp-text"><span id="st-xp">0</span> / <span id="st-xpnext">100</span> XP</div>
+        </div>
+      </div>
+
+      <div class="window">
+        <div class="window-title">ХАРАКТЕРИСТИКИ</div>
+        <div class="stats" id="st-stats"></div>
+        <div class="free-points" id="st-free"></div>
+      </div>
+
+      <div class="window small">
+        <div class="window-title">СЕГОДНЯ</div>
+        <div class="today-line">
+          Ежедневный квест: <b id="st-daily">0/0</b>
+          <span class="muted">· до сброса <span class="timer" data-timer>--:--:--</span></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Экран: КВЕСТЫ ===== -->
+    <section class="screen" id="screen-quests" aria-label="Квесты">
+      <div class="window">
+        <div class="window-title">ЕЖЕДНЕВНЫЙ КВЕСТ</div>
+        <p class="quest-sub">Подготовка к тому, чтобы стать сильнее</p>
+        <ul class="quest-list" id="daily-list"></ul>
+        <p class="warning">⚠ Если не выполнить ежедневный квест до полуночи, будет <b>наказание</b>.</p>
+        <div class="timer-row">До сброса: <span class="timer" data-timer>--:--:--</span></div>
+      </div>
+
+      <div class="window">
+        <div class="window-title">ПОБОЧНЫЕ КВЕСТЫ</div>
+        <form class="add-form" id="side-form" autocomplete="off">
+          <input id="side-title" type="text" maxlength="80" placeholder="Например: сдать лабу по ЦУС" required aria-label="Название квеста">
+          <div class="add-row">
+            <select id="side-stat" aria-label="Характеристика"></select>
+            <select id="side-rank" aria-label="Ранг квеста"></select>
+            <button class="btn" type="submit">Добавить</button>
+          </div>
+        </form>
+        <ul class="quest-list" id="side-list"></ul>
+      </div>
+    </section>
+
+    <!-- ===== Экран: ЖУРНАЛ ===== -->
+    <section class="screen" id="screen-log" aria-label="Журнал">
+      <div class="window">
+        <div class="window-title">ЖУРНАЛ СИСТЕМЫ</div>
+        <ul class="log" id="log-list"></ul>
+      </div>
+    </section>
+
+    <!-- ===== Экран: НАСТРОЙКИ ===== -->
+    <section class="screen" id="screen-settings" aria-label="Настройки">
+      <div class="window" id="install-box" hidden>
+        <div class="window-title">ПРИЛОЖЕНИЕ</div>
+        <p class="small-text" id="install-text">Поставь Систему на главный экран: откроется как обычное приложение, без браузера.</p>
+        <button class="btn" id="btn-install" type="button" hidden>Установить приложение</button>
+      </div>
+
+      <div class="window">
+        <div class="window-title">ИГРОК</div>
+        <label class="field">Имя
+          <input id="set-name" type="text" maxlength="24">
+        </label>
+      </div>
+
+      <div class="window">
+        <div class="window-title">ЕЖЕДНЕВНЫЕ ЗАДАНИЯ</div>
+        <p class="muted small-text">Изменения вступят в силу сразу. Квесты, уже отмеченные сегодня, сохранятся.</p>
+        <ul class="edit-list" id="set-dailies"></ul>
+        <form class="add-form" id="daily-form" autocomplete="off">
+          <input id="daily-title" type="text" maxlength="60" placeholder="Новое задание" required aria-label="Новое ежедневное задание">
+          <div class="add-row">
+            <select id="daily-stat" aria-label="Характеристика"></select>
+            <button class="btn" type="submit">Добавить</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="window">
+        <div class="window-title">СОХРАНЕНИЕ</div>
+        <p class="muted small-text">Прогресс хранится только на этом устройстве. Время от времени делай резервную копию.</p>
+        <div class="btn-row">
+          <button class="btn" id="btn-export" type="button">Скачать копию</button>
+          <label class="btn" for="file-import">Загрузить копию</label>
+          <input id="file-import" type="file" accept="application/json" hidden>
+        </div>
+        <button class="btn danger" id="btn-reset" type="button">Сбросить весь прогресс</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- ===== Нижняя панель вкладок ===== -->
+  <nav class="tabbar" aria-label="Разделы">
+    <button class="tab active" data-screen="status" type="button"><span class="ic">◈</span>Статус</button>
+    <button class="tab" data-screen="quests" type="button"><span class="ic">⚔</span>Квесты<span class="badge" id="tab-badge" hidden></span></button>
+    <button class="tab" data-screen="log" type="button"><span class="ic">☰</span>Журнал</button>
+    <button class="tab" data-screen="settings" type="button"><span class="ic">⚙</span>Настройки</button>
+  </nav>
+
+  <!-- ===== Всплывающие уведомления Системы ===== -->
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <!-- ===== Модальное окно (пробуждение, новый уровень, подтверждения) ===== -->
+  <div class="modal" id="modal" hidden>
+    <div class="window modal-window" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="window-title" id="modal-title">УВЕДОМЛЕНИЕ</div>
+      <div id="modal-body"></div>
+      <div class="btn-row" id="modal-buttons"></div>
+    </div>
+  </div>
+
+  <!-- ===== Штрафная зона: перекрывает всё, пока не выполнишь ===== -->
+  <div class="penalty" id="penalty" hidden>
+    <div class="window penalty-window" role="alertdialog" aria-modal="true" aria-labelledby="penalty-title">
+      <div class="window-title" id="penalty-title">ШТРАФНАЯ ЗОНА</div>
+      <p>Ежедневный квест не выполнен. Начинается наказание.</p>
+      <div class="penalty-task" id="penalty-task"></div>
+      <p class="muted small-text" id="penalty-loss"></p>
+      <button class="btn danger hold" id="penalty-done" type="button">
+        <span class="hold-fill"></span><span class="hold-text">Удерживай, когда выполнишь</span>
+      </button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

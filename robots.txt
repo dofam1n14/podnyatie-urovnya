@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://podnyatie-urovnya.pages.dev/sitemap.xml
