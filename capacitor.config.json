@@ -1,0 +1,14 @@
+{
+  "appId": "ru.dofam1n14.sistema",
+  "appName": "Система",
+  "webDir": "www",
+  "backgroundColor": "#05070f",
+  "android": {
+    "adjustMarginsForEdgeToEdge": "force"
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "iconColor": "#39b8ff"
+    }
+  }
+}

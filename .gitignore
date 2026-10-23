@@ -1,0 +1,4 @@
+# Всё это собирается заново в GitHub Actions
+node_modules/
+www/
+android/

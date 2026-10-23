@@ -1,0 +1,15 @@
+{
+  "name": "podnyatie-urovnya",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Система — поднятие уровня в реальной жизни (PWA + Android через Capacitor)",
+  "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/local-notifications": "^7.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^7.0.0"
+  }
+}
