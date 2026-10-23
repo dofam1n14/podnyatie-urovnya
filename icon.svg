@@ -1,16 +1,76 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- Иконка: синее окно Системы с буквой S (ранг S) -->
+  <!-- Иконка «Системы»: кинжал на фоне светящихся врат (портала).
+       Всё важное — в центральном круге, чтобы Android не обрезал при круглой маске. -->
   <defs>
-    <radialGradient id="bg" cx="50%" cy="35%" r="75%">
-      <stop offset="0" stop-color="#14306b"/>
-      <stop offset="1" stop-color="#05070f"/>
+    <!-- Фон: глубокий синий, светлее в центре -->
+    <radialGradient id="bg" cx="50%" cy="52%" r="70%">
+      <stop offset="0" stop-color="#1a2f86"/>
+      <stop offset=".45" stop-color="#0b1240"/>
+      <stop offset="1" stop-color="#03040c"/>
     </radialGradient>
-    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="8" result="b"/>
+    <!-- Кольцо врат: от голубого к фиолетовому -->
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6fe3ff"/>
+      <stop offset=".5" stop-color="#3a7bff"/>
+      <stop offset="1" stop-color="#9b5cff"/>
+    </linearGradient>
+    <!-- Свечение внутри врат -->
+    <radialGradient id="core" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#7fd4ff" stop-opacity=".55"/>
+      <stop offset=".6" stop-color="#3a5cff" stop-opacity=".18"/>
+      <stop offset="1" stop-color="#3a5cff" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Лезвие: белое у острия, голубое к гарде -->
+    <linearGradient id="blade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#8fd8ff"/>
+    </linearGradient>
+    <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9fe6ff" stop-opacity="0"/>
+      <stop offset=".5" stop-color="#9fe6ff" stop-opacity=".35"/>
+      <stop offset="1" stop-color="#9fe6ff" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="9" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="b"/>
       <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
+
   <rect width="512" height="512" fill="url(#bg)"/>
-  <rect x="96" y="96" width="320" height="320" rx="14" fill="none" stroke="#39b8ff" stroke-width="10" filter="url(#glow)"/>
-  <text x="256" y="330" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="230" fill="#e8f6ff" filter="url(#glow)">S</text>
+
+  <!-- Врата: свечение, толстое кольцо и тонкий круг с «рунами» -->
+  <circle cx="256" cy="262" r="150" fill="url(#core)"/>
+  <circle cx="256" cy="262" r="150" fill="none" stroke="url(#ring)" stroke-width="12" filter="url(#glow)"/>
+  <circle cx="256" cy="262" r="124" fill="none" stroke="#6fd0ff" stroke-opacity=".55" stroke-width="3" stroke-dasharray="2 10 18 10"/>
+
+  <!-- Луч света вдоль кинжала -->
+  <rect x="244" y="70" width="24" height="380" fill="url(#beam)"/>
+
+  <!-- Кинжал остриём вверх -->
+  <g filter="url(#soft)">
+    <!-- лезвие -->
+    <path d="M256 100 L288 150 L284 322 L228 322 L224 150 Z" fill="url(#blade)"/>
+    <!-- центральный дол (ребро лезвия) -->
+    <path d="M256 128 L256 318" stroke="#3a7bff" stroke-opacity=".55" stroke-width="3"/>
+    <!-- гарда с загнутыми концами -->
+    <path d="M196 322 L316 322 L330 308 L326 336 L316 340 L196 340 L186 336 L182 308 Z" fill="#d9f3ff"/>
+    <!-- рукоять -->
+    <rect x="243" y="340" width="26" height="58" rx="4" fill="#2a4bb8"/>
+    <path d="M243 354 H269 M243 368 H269 M243 382 H269" stroke="#7fd4ff" stroke-width="3"/>
+    <!-- навершие -->
+    <path d="M256 398 L270 412 L256 426 L242 412 Z" fill="#d9f3ff"/>
+  </g>
+
+  <!-- Искры -->
+  <g fill="#bff0ff" filter="url(#soft)">
+    <circle cx="160" cy="180" r="4"/>
+    <circle cx="352" cy="166" r="3"/>
+    <circle cx="370" cy="330" r="4"/>
+    <circle cx="146" cy="342" r="3"/>
+    <circle cx="300" cy="140" r="2.5"/>
+  </g>
 </svg>

@@ -106,6 +106,7 @@ function newState() {
     streak: 0,
     best: 0,
     log: [],
+    notify: { on: true, morning: '09:00', evening: '21:00' }, // напоминания (только в Android-приложении)
   };
 }
 
@@ -121,6 +122,89 @@ function load() {
 
 function save() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) { /* память недоступна */ }
+  planNotifications();
+}
+
+/* ---------- Напоминания (Android-приложение через Capacitor) ---------- */
+
+// В APK Capacitor сам добавляет объект window.Capacitor; на сайте его нет
+const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+const Notif = isNative ? window.Capacitor.Plugins.LocalNotifications : null;
+
+let notifyTimer = 0;
+
+// Пересобираем расписание не на каждый клик, а через полсекунды после последнего изменения
+function planNotifications() {
+  if (!Notif) return;
+  clearTimeout(notifyTimer);
+  notifyTimer = setTimeout(rescheduleNotifications, 500);
+}
+
+// Дата: через dayOffset дней в указанное время "ЧЧ:ММ"
+function atTime(dayOffset, hhmm) {
+  const [h, m] = hhmm.split(':').map(Number);
+  const d = new Date();
+  d.setDate(d.getDate() + dayOffset);
+  d.setHours(h, m, 0, 0);
+  return d;
+}
+
+async function rescheduleNotifications() {
+  try {
+    // Сначала убираем всё запланированное раньше
+    const pending = await Notif.getPending();
+    if (pending.notifications.length) {
+      await Notif.cancel({ notifications: pending.notifications.map((n) => ({ id: n.id })) });
+    }
+    const n = state.notify;
+    if (!n.on || !state.dailies.length) return;
+
+    const now = new Date();
+    const list = [];
+    // Планируем на неделю вперёд: если приложение не открывать, напоминания всё равно придут
+    for (let i = 0; i < 7; i++) {
+      const morning = atTime(i, n.morning);
+      if (morning > now) {
+        list.push({
+          id: 100 + i,
+          title: '[СИСТЕМА] Ежедневный квест',
+          body: 'Поступил новый ежедневный квест: «Подготовка к тому, чтобы стать сильнее».',
+          schedule: { at: morning, allowWhileIdle: true },
+        });
+      }
+      const evening = atTime(i, n.evening);
+      // Сегодня предупреждаем, только если квест ещё не закрыт
+      if (evening > now && !(i === 0 && dailyAllDone())) {
+        const left = state.dailies.filter((d) => !state.today.done.includes(d.id)).length;
+        list.push({
+          id: 200 + i,
+          title: '[СИСТЕМА] Предупреждение',
+          body: i === 0
+            ? `Ежедневный квест не выполнен (осталось заданий: ${left}). В полночь начнётся наказание.`
+            : 'Ежедневный квест не выполнен. В полночь начнётся наказание.',
+          schedule: { at: evening, allowWhileIdle: true },
+        });
+      }
+    }
+    if (list.length) await Notif.schedule({ notifications: list });
+  } catch (e) {
+    console.warn('Напоминания не запланированы', e);
+  }
+}
+
+// Включение: на Android 13+ нужно разрешение пользователя
+async function enableNotifications() {
+  if (!Notif) return false;
+  try {
+    const p = await Notif.requestPermissions();
+    if (p.display !== 'granted') {
+      toast('Без разрешения на уведомления напоминаний не будет.', 'bad');
+      return false;
+    }
+    return true;
+  } catch (e) {
+    return false;
+  }
 }
 
 /* ---------- Журнал и уведомления ---------- */
@@ -352,6 +436,10 @@ function showAwakening() {
         save();
         render();
         toast('Добро пожаловать, Игрок.', 'gold');
+        // В приложении сразу просим разрешение на напоминания
+        if (isNative && state.notify.on) {
+          enableNotifications().then((ok) => { if (!ok) { state.notify.on = false; save(); render(); } });
+        }
       },
     }]);
 }
@@ -431,6 +519,12 @@ function render() {
   $('#set-dailies').innerHTML = state.dailies.map((d) => `
     <li><span>${esc(d.title)} <span class="muted">· ${STATS[d.stat].short}</span></span>
       <button class="q-del" data-deldaily="${d.id}" type="button" aria-label="Удалить задание">✕</button></li>`).join('');
+
+  // Напоминания
+  $('#notify-box').hidden = !isNative;
+  $('#nt-on').checked = state.notify.on;
+  $('#nt-morning').value = state.notify.morning;
+  $('#nt-evening').value = state.notify.evening;
 
   // Штрафная зона
   const p = state.penalty;
@@ -520,6 +614,21 @@ $('#set-name').addEventListener('change', (e) => {
   save(); render();
 });
 
+$('#nt-on').addEventListener('change', async (e) => {
+  const on = e.target.checked && await enableNotifications();
+  state.notify.on = on;
+  save(); render();
+  if (on) toast('Напоминания включены.', 'gold');
+});
+
+['morning', 'evening'].forEach((k) => {
+  $('#nt-' + k).addEventListener('change', (e) => {
+    if (!e.target.value) return;
+    state.notify[k] = e.target.value;
+    save();
+  });
+});
+
 // Резервная копия в файл
 $('#btn-export').addEventListener('click', () => {
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
@@ -607,6 +716,8 @@ $('#btn-install').addEventListener('click', async () => {
 });
 
 // Service worker — чтобы приложение работало без интернета и ставилось на телефон
-if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+// (в APK файлы и так лежат внутри приложения, там он не нужен)
+planNotifications();
+if ('serviceWorker' in navigator && location.protocol !== 'file:' && !isNative) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }

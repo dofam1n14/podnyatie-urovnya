@@ -114,6 +114,21 @@
         <button class="btn" id="btn-install" type="button" hidden>Установить приложение</button>
       </div>
 
+      <!-- Напоминания работают только в Android-приложении -->
+      <div class="window" id="notify-box" hidden>
+        <div class="window-title">НАПОМИНАНИЯ</div>
+        <label class="toggle"><input type="checkbox" id="nt-on"> Уведомления от Системы</label>
+        <div class="time-row">
+          <label class="field">Новый квест
+            <input type="time" id="nt-morning">
+          </label>
+          <label class="field">Предупреждение
+            <input type="time" id="nt-evening">
+          </label>
+        </div>
+        <p class="muted small-text">Утром придёт новый ежедневный квест. Вечером, если он не выполнен, Система предупредит о наказании.</p>
+      </div>
+
       <div class="window">
         <div class="window-title">ИГРОК</div>
         <label class="field">Имя
