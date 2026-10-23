@@ -14,13 +14,13 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
@@ -64,9 +64,21 @@ jobs:
           mkdir -p ~/.android
           cp android-build/debug.keystore ~/.android/debug.keystore
 
+      # Лог пишем в файл: при ошибке хвост попадёт в «Annotations», их видно без входа в GitHub
       - name: Собрать APK
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon
+        run: |
+          chmod +x gradlew
+          set -o pipefail
+          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee ../build.log
+
+      - name: Показать ошибку сборки
+        if: failure()
+        run: |
+          grep -E -A12 "What went wrong|error:|FAILURE" build.log | head -60 > err.txt || tail -60 build.log > err.txt
+          [ -s err.txt ] || tail -60 build.log > err.txt
+          msg=$(sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g' err.txt)
+          echo "::error title=Gradle::$msg"
 
       - name: Выложить APK в Releases
         env:
