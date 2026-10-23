@@ -107,6 +107,7 @@ function newState() {
     best: 0,
     log: [],
     notify: { on: true, morning: '09:00', evening: '21:00' }, // напоминания (только в Android-приложении)
+    online: { joined: false, nick: '', secret: '' },          // онлайн-рейтинг
   };
 }
 
@@ -123,6 +124,129 @@ function load() {
 function save() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) { /* память недоступна */ }
   planNotifications();
+  planSync();
+}
+
+/* ---------- Онлайн-рейтинг (Supabase через посредника на нашем сайте) ---------- */
+
+const SITE = 'https://podnyatie-urovnya.pages.dev';
+const SB_URL = 'https://jhoqjypixkilfnshonmk.supabase.co/rest/v1/';
+const SB_KEY = 'sb_publishable_UtLoaxB21zedKXUD0wberQ_ozjqaE1D'; // публичный ключ: читать витрину и вызывать функции
+
+// Запрос к базе: сначала через наш сайт (/sb/), если не вышло — напрямую в Supabase
+async function api(path, body) {
+  const opts = body
+    ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+    : {};
+  const proxy = (location.hostname.endsWith('pages.dev') ? '' : SITE) + '/sb/' + path;
+  try {
+    const r = await fetch(proxy, opts);
+    if (r.ok) return await r.json(); // await — чтобы ошибка разбора тоже ушла в catch
+  } catch (e) { /* посредник недоступен — пробуем напрямую */ }
+  const r = await fetch(SB_URL + path, { ...opts, headers: { ...(opts.headers || {}), apikey: SB_KEY } });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+
+// Весь опыт с начала игры: сумма за пройденные уровни + текущий
+const totalXp = () => 100 * (state.level - 1) + 15 * (state.level - 1) * (state.level - 2) + state.xp;
+
+// Секретный код устройства: по нему база понимает, что ник твой
+function onlineSecret() {
+  if (!state.online.secret) {
+    const b = new Uint8Array(24);
+    crypto.getRandomValues(b);
+    state.online.secret = [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
+  }
+  return state.online.secret;
+}
+
+async function submitProgress() {
+  return api('rpc/sys_submit', {
+    p_nick: state.online.nick,
+    p_secret: onlineSecret(),
+    p_level: state.level,
+    p_total_xp: totalXp(),
+    p_streak: state.streak,
+    p_best: Math.max(state.best, state.streak),
+  });
+}
+
+// После изменений отправляем прогресс в рейтинг (не чаще раза в 3 секунды)
+let syncTimer = 0;
+function planSync() {
+  if (!state.online.joined) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(async () => {
+    try {
+      const res = await submitProgress();
+      if (res === 'taken') {
+        state.online.joined = false;
+        save(); render();
+        topMsg('Твой ник в рейтинге занят с другого устройства. Выбери новый.', true);
+      }
+    } catch (e) { /* нет интернета — отправим при следующем изменении */ }
+  }, 3000);
+}
+
+function topMsg(text, bad = false) {
+  const el = $('#top-msg');
+  el.textContent = text;
+  el.classList.toggle('bad', bad);
+}
+
+let topSort = 'total_xp';
+
+async function loadTop() {
+  const list = $('#top-list');
+  list.innerHTML = '<li class="muted small-text">Загрузка…</li>';
+  try {
+    const rows = await api(`sys_leaderboard?select=nick,level,total_xp,streak,best&order=${topSort}.desc,total_xp.desc&limit=100`);
+    const me = state.online.joined ? state.online.nick.toLowerCase() : null;
+    let place = '100+';
+    list.innerHTML = rows.map((r, i) => {
+      const mine = me && r.nick.toLowerCase() === me;
+      if (mine) place = i + 1;
+      const val = topSort === 'best' ? `${r.best} дн.` : `${r.total_xp} XP`;
+      return `<li class="top-row ${mine ? 'me' : ''}">
+        <span class="top-place">${i + 1}</span>
+        <span class="rank">${rankOf(r.level).rank}</span>
+        <span class="top-nick">${esc(r.nick)}<small>Ур. ${r.level} · серия ${r.streak}</small></span>
+        <span class="top-val">${val}</span>
+      </li>`;
+    }).join('') || '<li class="muted small-text">Пока никого. Стань первым охотником в рейтинге!</li>';
+    $('#top-place').textContent = place;
+  } catch (e) {
+    list.innerHTML = '<li class="muted small-text">Не удалось загрузить рейтинг. Проверь интернет и нажми «Обновить».</li>';
+  }
+}
+
+async function joinTop(nick) {
+  nick = nick.trim();
+  if (!nick) return;
+  topMsg('Проверяю ник…');
+  try {
+    const check = await api('rpc/sys_check_nick', { p_nick: nick, p_secret: onlineSecret() });
+    if (check === 'taken') { topMsg('Этот ник уже занят другим охотником. Выбери другой.', true); return; }
+    state.online.nick = nick;
+    const res = await submitProgress();
+    if (res !== 'new' && res !== 'ok') { topMsg('Система отклонила данные (' + res + ').', true); return; }
+    state.online.joined = true;
+    addLog(`Вход в рейтинг охотников под ником ${nick}`, 'good');
+    save(); render();
+    topMsg('');
+    toast('Ты в рейтинге охотников!', 'gold');
+    loadTop();
+  } catch (e) {
+    topMsg('Нет связи с Системой. Проверь интернет.', true);
+  }
+}
+
+async function leaveTop() {
+  try { await api('rpc/sys_leave', { p_nick: state.online.nick, p_secret: onlineSecret() }); } catch (e) { /* не страшно */ }
+  state.online.joined = false;
+  save(); render();
+  loadTop();
 }
 
 /* ---------- Напоминания (Android-приложение через Capacitor) ---------- */
@@ -520,6 +644,12 @@ function render() {
     <li><span>${esc(d.title)} <span class="muted">· ${STATS[d.stat].short}</span></span>
       <button class="q-del" data-deldaily="${d.id}" type="button" aria-label="Удалить задание">✕</button></li>`).join('');
 
+  // Рейтинг
+  $('#top-join').hidden = state.online.joined;
+  $('#top-me').hidden = !state.online.joined;
+  $('#top-mynick').textContent = state.online.nick;
+  if (!$('#top-nick').value && document.activeElement !== $('#top-nick')) $('#top-nick').value = state.name;
+
   // Напоминания
   $('#notify-box').hidden = !isNative;
   $('#nt-on').checked = state.notify.on;
@@ -558,6 +688,18 @@ document.querySelectorAll('.tab').forEach((tab) => {
     document.querySelectorAll('.screen').forEach((s) =>
       s.classList.toggle('active', s.id === 'screen-' + tab.dataset.screen));
     window.scrollTo(0, 0);
+    if (tab.dataset.screen === 'top') loadTop();
+  });
+});
+
+$('#top-join').addEventListener('submit', (e) => { e.preventDefault(); joinTop($('#top-nick').value); });
+$('#btn-leave').addEventListener('click', leaveTop);
+$('#btn-top-refresh').addEventListener('click', loadTop);
+document.querySelectorAll('.seg button').forEach((b) => {
+  b.addEventListener('click', () => {
+    topSort = b.dataset.sort;
+    document.querySelectorAll('.seg button').forEach((x) => x.classList.toggle('active', x === b));
+    loadTop();
   });
 });
 

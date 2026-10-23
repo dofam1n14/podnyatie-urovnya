@@ -98,6 +98,34 @@
       </div>
     </section>
 
+    <!-- ===== Экран: РЕЙТИНГ ===== -->
+    <section class="screen" id="screen-top" aria-label="Рейтинг">
+      <div class="window">
+        <div class="window-title">РЕЙТИНГ ОХОТНИКОВ</div>
+        <!-- Ещё не в рейтинге: выбор ника -->
+        <form class="add-form" id="top-join" autocomplete="off">
+          <p class="small-text">Покажи свой уровень другим охотникам. В рейтинг уходят только ник, уровень, опыт и серия дней.</p>
+          <div class="add-row">
+            <input id="top-nick" type="text" maxlength="20" placeholder="Ник охотника" required aria-label="Ник в рейтинге">
+            <button class="btn" type="submit">Войти</button>
+          </div>
+        </form>
+        <!-- Уже в рейтинге -->
+        <div class="top-me" id="top-me" hidden>
+          Ты в рейтинге как <b id="top-mynick"></b>, место <b id="top-place">—</b>
+          <button class="link" id="btn-leave" type="button">выйти</button>
+        </div>
+        <p class="small-text top-msg" id="top-msg" aria-live="polite"></p>
+
+        <div class="seg" role="tablist" aria-label="Сортировка">
+          <button class="active" data-sort="total_xp" type="button" role="tab">По опыту</button>
+          <button data-sort="best" type="button" role="tab">По серии</button>
+        </div>
+        <ol class="top-list" id="top-list"></ol>
+        <button class="btn top-refresh" id="btn-top-refresh" type="button">Обновить</button>
+      </div>
+    </section>
+
     <!-- ===== Экран: ЖУРНАЛ ===== -->
     <section class="screen" id="screen-log" aria-label="Журнал">
       <div class="window">
@@ -166,6 +194,7 @@
   <nav class="tabbar" aria-label="Разделы">
     <button class="tab active" data-screen="status" type="button"><span class="ic">◈</span>Статус</button>
     <button class="tab" data-screen="quests" type="button"><span class="ic">⚔</span>Квесты<span class="badge" id="tab-badge" hidden></span></button>
+    <button class="tab" data-screen="top" type="button"><span class="ic">♛</span>Рейтинг</button>
     <button class="tab" data-screen="log" type="button"><span class="ic">☰</span>Журнал</button>
     <button class="tab" data-screen="settings" type="button"><span class="ic">⚙</span>Настройки</button>
   </nav>

@@ -15,6 +15,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; } /* иначе display:grid у форм перебивает hidden */
 
 html, body { margin: 0; height: 100%; }
 
@@ -249,6 +250,45 @@ input[type="time"] {
   font-size: 15px;
 }
 .edit-list li span { flex: 1; }
+
+/* ===== Рейтинг ===== */
+.top-me { font-size: 15px; }
+.top-msg { min-height: 1.2em; margin: 6px 0; color: var(--muted); }
+.top-msg.bad { color: var(--red); }
+.link {
+  background: none; border: none; padding: 0 4px;
+  color: var(--muted); font: inherit; font-size: 14px;
+  text-decoration: underline; cursor: pointer;
+}
+
+.seg { display: flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; margin: 8px 0 12px; }
+.seg button {
+  flex: 1;
+  background: none; border: none;
+  color: var(--muted); font: inherit; font-size: 14px;
+  padding: 8px; cursor: pointer;
+}
+.seg button.active { background: rgba(57, 184, 255, .2); color: var(--text); }
+
+.top-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.top-row {
+  display: grid;
+  grid-template-columns: 34px 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(57, 184, 255, .25);
+  border-radius: 4px;
+}
+.top-row.me { border-color: var(--gold); box-shadow: 0 0 10px rgba(255, 207, 90, .3); }
+.top-place { font-family: "Russo One", sans-serif; color: var(--muted); text-align: center; }
+.top-row:nth-child(1) .top-place { color: var(--gold); }
+.top-row:nth-child(2) .top-place { color: #d6e2f0; }
+.top-row:nth-child(3) .top-place { color: #e0a070; }
+.top-nick { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.top-nick small { display: block; color: var(--muted); font-size: 12px; }
+.top-val { font-family: "Russo One", sans-serif; font-size: 15px; text-align: right; }
+.top-refresh { width: 100%; margin-top: 12px; }
 
 /* ===== Журнал ===== */
 .log { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; }

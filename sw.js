@@ -1,6 +1,6 @@
 // Service worker: кэширует файлы приложения, чтобы оно открывалось без интернета.
 // При изменении файлов увеличивай номер версии — тогда кэш обновится.
-const CACHE = 'system-v4';
+const CACHE = 'system-v5';
 const FILES = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', (e) => {
